@@ -1,0 +1,239 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── College ───────────────────────────────────────────────
+model College {
+  id        String   @id @default(cuid())
+  name      String
+  domain    String   @unique
+  logo      String?
+  city      String?
+  state     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
+  posts     Post[]
+  resources Resource[]
+  events    Event[]
+  listings  Listing[]
+
+  @@map("colleges")
+}
+
+// ─── User ──────────────────────────────────────────────────
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  emailVerified DateTime?
+  password      String
+  avatar        String?
+  bio           String?
+  branch        String?
+  year          Int?
+  role          String    @default("STUDENT")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  collegeId String
+  college   College @relation(fields: [collegeId], references: [id])
+
+  posts     Post[]
+  comments  Comment[]
+  likes     Like[]
+  resources Resource[]
+  events    Event[]    @relation("EventOrganizer")
+  rsvps     RSVP[]
+  listings  Listing[]
+
+  accounts Account[]
+  sessions Session[]
+
+  @@map("users")
+}
+
+// ─── NextAuth Models ───────────────────────────────────────
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ─── Post (Campus Feed) ────────────────────────────────────
+model Post {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  category  String   @default("GENERAL")
+  image     String?
+  pinned    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  authorId  String
+  author    User    @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  collegeId String
+  college   College @relation(fields: [collegeId], references: [id])
+
+  comments Comment[]
+  likes    Like[]
+
+  @@map("posts")
+}
+
+// ─── Comment ───────────────────────────────────────────────
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  postId   String
+  post     Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  parentId String?
+  parent   Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies  Comment[] @relation("CommentReplies")
+
+  @@map("comments")
+}
+
+// ─── Like ──────────────────────────────────────────────────
+model Like {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@map("likes")
+}
+
+// ─── Resource (Notes, PYQs) ────────────────────────────────
+model Resource {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  type        String   @default("NOTES")
+  fileUrl     String
+  fileName    String
+  fileSize    Int
+  subject     String
+  semester    Int
+  branch      String
+  downloads   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  uploaderId String
+  uploader   User    @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+  collegeId  String
+  college    College @relation(fields: [collegeId], references: [id])
+
+  @@map("resources")
+}
+
+// ─── Event ─────────────────────────────────────────────────
+model Event {
+  id          String    @id @default(cuid())
+  title       String
+  description String
+  image       String?
+  location    String?
+  startDate   DateTime
+  endDate     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  organizerId String
+  organizer   User    @relation("EventOrganizer", fields: [organizerId], references: [id], onDelete: Cascade)
+  collegeId   String
+  college     College @relation(fields: [collegeId], references: [id])
+
+  rsvps RSVP[]
+
+  @@map("events")
+}
+
+// ─── Listing (Marketplace) ──────────────────────────────────
+model Listing {
+  id            String   @id @default(cuid())
+  title         String
+  description   String
+  price         Int
+  originalPrice Int?
+  category      String   @default("OTHER")
+  condition     String   @default("GOOD")
+  image         String?
+  sold          Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  sellerId  String
+  seller    User    @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  collegeId String
+  college   College @relation(fields: [collegeId], references: [id])
+
+  @@map("listings")
+}
+
+// ─── RSVP ──────────────────────────────────────────────────
+model RSVP {
+  id        String   @id @default(cuid())
+  status    String   @default("GOING")
+  createdAt DateTime @default(now())
+
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId])
+  @@map("rsvps")
+}
